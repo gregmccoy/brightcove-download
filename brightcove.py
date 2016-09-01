@@ -20,6 +20,24 @@ def get_videos(page):
     ))
     return result.json()
 
+def get_playlist():
+    result = requests.get(readConf("ENDPOINT"), params=dict(
+        command="find_all_playlists",
+        token=readConf("TOKEN"),
+    ))
+    return result.json()
+
+def parse_playlist(playlist, cur):
+    for item in playlist['items']:
+        print("Copying playlist - " + str(item['name']))
+        videos = ""
+        for video in item['videos']:
+            videos += str(video["id"]) + "|"
+        cur.execute("INSERT INTO Playlist (brightcoveID, Name, shortDesc, videos) VALUES (%s, %s, %s, %s);" \
+                , (str(item["id"]), str(item["name"]), str(item["shortDescription"]), videos))
+
+    return str(len(playlist['items']))
+
 def parse_videos(videos, cur):
     for item in videos['items']:
         tags = ""
@@ -51,14 +69,20 @@ def process():
     cur = conn.cursor()
     try:
         cur.execute("DROP TABLE Videos;")
+        cur.execute("DROP TABLE Playlist;")
     except:
         print("Failed to drop table ")
 
     try:
         cur.execute("CREATE TABLE Videos(Id SERIAL PRIMARY KEY, brightcoveID TEXT,  Name VARCHAR(200), PosterFrame TEXT, longDesc TEXT, shortDesc TEXT, tags TEXT, linkText TEXT);")
+        cur.execute("CREATE TABLE Playlist(Id SERIAL PRIMARY KEY, brightcoveID TEXT,  Name VARCHAR(200), shortDesc TEXT, videos TEXT);")
     except:
         print("Failed to create table ")
         return
+
+    data = get_playlist()
+    count = parse_playlist(data, cur)
+    print(count + " playlists")
 
     count = 1
     page = 0
@@ -68,5 +92,6 @@ def process():
         print(count + " videos")
         print ("Page " + str(page))
         page += 1
+
 
 process()
